@@ -55,7 +55,7 @@ class OfferImporterPipelineOptions(PipelineOptions):
         parser.add_argument(
             '--target_bq_table',
             required=True,
-            help='GCS path to the source csv containing the offers')
+            help='Target BigQuery table, make sure to also specify the dataset.')
 
 
 if __name__ == '__main__':
