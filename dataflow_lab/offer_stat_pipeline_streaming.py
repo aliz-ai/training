@@ -1,17 +1,13 @@
 from __future__ import absolute_import
 
 import argparse
+import datetime
 import logging
+import uuid
 
 import apache_beam as beam
-from apache_beam.transforms import window, trigger
-from apache_beam.io import BigQueryDisposition
 from apache_beam.options.pipeline_options import PipelineOptions
 from apache_beam.options.pipeline_options import SetupOptions
-from apache_beam.options.pipeline_options import StandardOptions
-import datetime
-
-from apache_beam.transforms.trigger import AccumulationMode
 
 OFFER_STAT_BQ_SCHEMA = 'offer_id:STRING,count:INTEGER,window_start:TIMESTAMP,window_end:TIMESTAMP,created_at:TIMESTAMP'
 
@@ -23,27 +19,15 @@ def run(argv=None):
 
     pipeline_options = PipelineOptions(pipeline_args)
     pipeline_options.view_as(SetupOptions).save_main_session = True
-    pipeline_options.view_as(StandardOptions).streaming = True
     offer_stat_pipeline_options = pipeline_options.view_as(OfferStatPipelineOptions)
 
     p = beam.Pipeline(options=pipeline_options)
 
-    p | "Read account offer from PS" >> beam.io.ReadFromPubSub(topic=offer_stat_pipeline_options.account_offers_topic) \
-    | "Parse message" >> beam.ParDo(PubsubMessageParser()) \
-    | "Windowing" >> beam.WindowInto(window.FixedWindows(60),
-                                     trigger=trigger.AfterWatermark(early=trigger.AfterProcessingTime(20)),
-                                     accumulation_mode=AccumulationMode.ACCUMULATING) \
-    | "WithKeys" >> beam.Map(lambda account_offer: ((account_offer['offer_id']), account_offer)) \
-    | beam.GroupByKey() \
-    | 'Count distinct accounts' >> beam.ParDo(DistinctAccountCount()) \
-    | 'Map to BQ row' >> beam.ParDo(ConvertStatToBQRow()) \
-    | 'Writing offers to BQ' >> beam.io.WriteToBigQuery(table=offer_stat_pipeline_options.offer_stat_bq_table,
-                                                        create_disposition=BigQueryDisposition.CREATE_IF_NEEDED,
-                                                        write_disposition=BigQueryDisposition.WRITE_APPEND,
-                                                        schema=OFFER_STAT_BQ_SCHEMA)
+    # TODO
 
     result = p.run()
     result.wait_until_finish()
+
 
 class PubsubMessageParser(beam.DoFn):
 
@@ -53,7 +37,7 @@ class PubsubMessageParser(beam.DoFn):
         account_id = splits[0]
         offer_id = splits[1]
         event_timestamp = timestamp
-        account_offer_id = element
+        account_offer_id = uuid.uuid4()
         if len(splits) == 3:
             event_timestamp = event_timestamp - int(splits[2])
 
@@ -73,20 +57,6 @@ class ConvertStatToBQRow(beam.DoFn):
                   'window_end': window.end.micros / 1000000}
         logging.info("Convert BQ row: %s", bq_row)
         yield bq_row
-
-
-class DistinctAccountCount(beam.DoFn):
-
-    def process(self, element, timestamp=beam.DoFn.TimestampParam, window=beam.DoFn.WindowParam, *args, **kwargs):
-        logging.info("Calculating distinct account ids for: %s", element)
-        (offer_id, enriched_offers) = element
-        distinct_account_ids = set()
-        for enriched_offer in enriched_offers:
-            distinct_account_ids.add(enriched_offer['account_id'])
-
-        output = (offer_id, len(distinct_account_ids))
-        logging.info("Distinct count result: %s", output)
-        yield output
 
 
 class OfferStatPipelineOptions(PipelineOptions):
