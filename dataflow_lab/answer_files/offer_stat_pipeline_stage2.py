@@ -24,10 +24,10 @@ def run(argv=None):
     p = beam.Pipeline(options=pipeline_options)
 
     users = p | "Read users" >> beam.io.Read(beam.io.BigQuerySource(table=offer_stat_pipeline_options.users_bq_table, flatten_results=False)) \
-        | beam.Map(lambda user_row: (user_row['account']['id'], user_row['country']))
+            | beam.Map(lambda user_row: (user_row['account_id'], user_row['country']))
 
     account_offers = p | "Read account offers" >> beam.io.Read(beam.io.BigQuerySource(table=offer_stat_pipeline_options.account_offers_bq_table, flatten_results=False)) \
-        | beam.Map(lambda row: (row['account_id'], row))
+                     | beam.Map(lambda row: (row['account_id'], row))
 
     offers = p | "Read offers" >> beam.io.Read(beam.io.BigQuerySource(table=offer_stat_pipeline_options.offers_bq_table, flatten_results=False)) \
         | beam.Map(lambda row: (row['offer_id'], row['offer_name']))
@@ -80,6 +80,7 @@ class UserCountryMerger(beam.DoFn):
         yield joined_data
 
 
+
 class OfferStatPipelineOptions(PipelineOptions):
 
     @classmethod
@@ -92,6 +93,9 @@ class OfferStatPipelineOptions(PipelineOptions):
             required=True)
         parser.add_argument(
             '--offers_bq_table',
+            required=True)
+        parser.add_argument(
+            '--project',
             required=True)
 
 
