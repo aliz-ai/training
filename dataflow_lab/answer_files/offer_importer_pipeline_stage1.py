@@ -20,7 +20,7 @@ def run(argv=None):
 
     p = beam.Pipeline(options=pipeline_options)
 
-    (p | beam.io.ReadFromText(file_pattern=offer_importer_pipeline_options.source_csv, skip_header_lines=1)
+    (p | beam.io.ReadFromText(file_pattern=offer_importer_pipeline_options.source_csv)
      | 'log' >> beam.ParDo(LoggerDoFn()))
 
     result = p.run()
@@ -30,7 +30,7 @@ def run(argv=None):
 class LoggerDoFn(beam.DoFn):
 
     def process(self, element, timestamp=beam.DoFn.TimestampParam, window=beam.DoFn.WindowParam, *args, **kwargs):
-        logging.info("Sum: %s, Timestamp: %s", str(
+        logging.info("Element: %s, Timestamp: %s", str(
             element), str(timestamp))
         yield element
 

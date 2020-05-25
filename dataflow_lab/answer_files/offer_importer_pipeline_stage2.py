@@ -33,7 +33,7 @@ def run(argv=None):
 class LoggerDoFn(beam.DoFn):
 
     def process(self, element, timestamp=beam.DoFn.TimestampParam, window=beam.DoFn.WindowParam, *args, **kwargs):
-        logging.info("Sum: %s, Timestamp: %s", str(element), str(timestamp))
+        logging.info("Element: %s, Timestamp: %s", str(element), str(timestamp))
         yield element
 
 
